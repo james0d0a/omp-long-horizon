@@ -1,0 +1,3 @@
+# Implement the Long-Horizon Engine as an OMP Extension Plugin
+
+The hand-off specified harness changes inside OMP's core loop (`src/horizon/*.ts`), but local `omp` is a compiled, auto-updating binary with no source checkout. We ship the engine as a standalone extension plugin (`package.json` with `omp.extensions`) built only on documented hooks — `session_before_compact` / `session.compacting`, `context`, `tool_result`, `session_stop`, `setActiveTools` / `setModel`, `appendEntry`, `registerFlag` — matching the precedent set by `omp-cyber-harness` ADR-0001. We accept the public hook surface and its 30-second per-handler budget as hard constraints rather than forking.

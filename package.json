@@ -1,0 +1,25 @@
+{
+	"name": "omp-long-horizon",
+	"version": "0.1.0",
+	"description": "Long-horizon engine for OMP: Working Memory Ledger, Failure-Signature circuit breaker, pinned Verifier gate, Best Checkpoints, and trace-reflect",
+	"type": "module",
+	"main": "./src/index.ts",
+	"omp": {
+		"extensions": [
+			"./src/index.ts"
+		]
+	},
+	"scripts": {
+		"test": "node --test \"tests/*.test.ts\"",
+		"typecheck": "tsc -p .",
+		"calibrate": "node scripts/calibrate.ts",
+		"trace-reflect": "node scripts/trace-reflect.ts"
+	},
+	"engines": {
+		"node": ">=22.18"
+	},
+	"devDependencies": {
+		"@types/node": "^22.20.5",
+		"typescript": "^5.9.3"
+	}
+}
