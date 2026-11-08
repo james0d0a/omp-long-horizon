@@ -9,6 +9,7 @@ export const DEFAULT_BREAKER: BreakerConfig = { threshold: 3, window: 8 };
 
 interface ExecStep {
 	signature: string;
+	scriptSignature?: string;
 	failed: boolean;
 }
 /**
@@ -28,11 +29,15 @@ export class FailureWindow {
 	}
 
 	/** Records one exec step; returns the failure count for its signature when it trips. */
-	record(signature: string, failed: boolean): number | undefined {
+	record(signature: string, failed: boolean, scriptSignature?: string): number | undefined {
 		if (!failed) {
-			for (const step of this.#steps) if (step.signature === signature) step.failed = false;
+			for (const step of this.#steps) {
+				if (step.signature === signature || (step.scriptSignature && step.scriptSignature === signature)) {
+					step.failed = false;
+				}
+			}
 		}
-		this.#steps.push({ signature, failed });
+		this.#steps.push({ signature, scriptSignature, failed });
 		if (this.#steps.length > this.#config.window) this.#steps.splice(0, this.#steps.length - this.#config.window);
 		if (!failed) return undefined;
 		const failures = this.#steps.filter(s => s.failed && s.signature === signature).length;

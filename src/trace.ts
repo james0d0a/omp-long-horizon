@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { type BreakerConfig, DEFAULT_BREAKER, FailureWindow } from "./breaker.ts";
 import { type AgentMessage, type BranchEntry, isRecord, textOf } from "./omp.ts";
-import { EXEC_TOOLS, failureSignature, READ_ONLY_TOOLS } from "./signature.ts";
+import { EXEC_TOOLS, failureSignature, inlineScriptSignature, READ_ONLY_TOOLS } from "./signature.ts";
 import { ENTRY, type VerifierResult } from "./types.ts";
 
 /** One tool call and its result, in transcript order. */
@@ -15,6 +15,7 @@ export interface TraceStep {
 	exec: boolean;
 	action: boolean;
 	signature?: string;
+	scriptSignature?: string;
 	text: string;
 }
 
@@ -116,6 +117,7 @@ export function buildTrace(entries: BranchEntry[], path = "<branch>"): Trace {
 			exec,
 			action: !READ_ONLY_TOOLS.has(message.toolName),
 			signature: exec ? failureSignature({ toolName: message.toolName, input, resultText: text, details: message.details }) : undefined,
+			scriptSignature: exec ? inlineScriptSignature({ toolName: message.toolName, input, resultText: text, details: message.details }) : undefined,
 			text,
 		});
 	}
@@ -142,7 +144,7 @@ export function tripWindows(trace: Trace, config: BreakerConfig = DEFAULT_BREAKE
 	for (let i = 0; i < execSteps.length; i++) {
 		const step = execSteps[i];
 		const signature = step.signature ?? "";
-		const failures = window.record(signature, step.isError);
+		const failures = window.record(signature, step.isError, step.scriptSignature);
 		if (failures === undefined) continue;
 		const lookback = execSteps.slice(Math.max(0, i - config.window + 1), i + 1);
 		const start = lookback.find(s => s.signature === signature && s.isError) ?? step;

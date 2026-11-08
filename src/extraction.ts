@@ -82,7 +82,7 @@ export function buildExtractionPrompt(contract: HorizonContract, ledger: LedgerS
 1. Record only what the transcript shows. Ground Truth must be verified by observed output, not intended or assumed.
 2. Preserve exact literals: IPs, hostnames, ports, hex offsets, register names, file paths, CLI flags, credentials, error codes and messages. Never paraphrase a literal.
 3. Graveyard entries name the exact command/approach AND the exact failure signal (error text or code), so it is never retried blindly.
-4. Do not add an entry that is already in the ledger. If new evidence proves a current entry wrong or outdated, use "supersede" with its id and a reason.
+4. Do not add an entry the ledger already covers, even if worded differently (same command family and same failure, or same fact). Add only genuinely new information. If new evidence proves a current entry wrong or outdated, use "supersede" with its id and a reason.
 5. "source" is the [id] of the transcript entry that shows the fact.
 6. Set the frontier only if the transcript shows what the agent is pursuing next; one or two sentences.
 7. If nothing qualifies, return {"ops": []}.
@@ -95,7 +95,7 @@ ${contract.graveyard_keys.map(k => `- ${k}`).join("\n")}
 
 OUTPUT SCHEMA
 {"ops": [
-4. Do not add an entry the ledger already covers, even if worded differently (same command family and same failure, or same fact). Add only genuinely new information. If new evidence proves a current entry wrong or outdated, use "supersede" with its id and a reason.
+  {"op": "add", "section": "ground_truth" | "graveyard", "text": "...", "source": "<entry id>"},
   {"op": "supersede", "id": "<gtN|gyN>", "text": "replacement", "reason": "why the old entry is wrong", "source": "<entry id>"},
   {"op": "set_frontier", "text": "..."}
 ]}

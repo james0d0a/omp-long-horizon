@@ -12,7 +12,7 @@ import { ompOneShot } from "./proc.ts";
 import { redact } from "./redact.ts";
 import { runReflect } from "./reflect.ts";
 import { actionStepsSince, llmCallsSince, reconstructRun, type RunView } from "./run.ts";
-import { EXEC_TOOLS, failureSignature, READ_ONLY_TOOLS } from "./signature.ts";
+import { EXEC_TOOLS, failureSignature, inlineScriptSignature, READ_ONLY_TOOLS } from "./signature.ts";
 import { type AppliedOp, type BestCheckpoint, ENTRY, type LedgerSection, type RunOutcome } from "./types.ts";
 import { assessProgress, createPin, formatVerdict, resolveVerifierPath, runVerifier } from "./verifier.ts";
 
@@ -28,7 +28,7 @@ let mainLedgerView: { render(): string; list(which: "all" | LedgerSection | "his
 
 const HORIZON_TOOLS = new Set(["ledger", "verify"]);
 const WRITE_TOOLS = new Set(["write", "edit", "ast_edit", "apply_patch", "notebook"]);
-const SHELL_WRITE = /(^|[\s;&|])(>|>>|tee\b|sed\s+-i|perl\s+-[a-z]*i|cp\b|mv\b|rm\b|chmod\b|truncate\b|install\b|rsync\b|git\s+(checkout|restore|apply|stash))/;
+const SHELL_WRITE = /(^|[\s;&|])(>|>>|tee\b|sed\s+-i|perl\s+-[a-z]*i|cp\b|mv\b|rm\b|chmod\b|truncate\b|install\b|rsync\b|dd\b|patch\b|python3?\s+(-[ce]|-?\s*<<)|node\s+-e|bun\s+-e|ruby\s+-e|git\s+(checkout|restore|apply|stash))/;
 
 interface TripState {
 	signature: string;
@@ -423,7 +423,8 @@ export default function omplongHorizon(pi: ExtensionAPI): void {
 		const mentions = strings.includes(pin.dir) || (rel !== "" && !rel.startsWith("..") && strings.includes(`${rel}/`)) || (rel !== "" && strings.includes(`"${rel}"`));
 		if (!mentions) return;
 		const command = typeof event.input.command === "string" ? event.input.command : "";
-		if (WRITE_TOOLS.has(event.toolName) || (EXEC_TOOLS.has(event.toolName) && SHELL_WRITE.test(command))) {
+		const isEval = event.toolName === "eval" || event.toolName === "python";
+		if (WRITE_TOOLS.has(event.toolName) || isEval || (EXEC_TOOLS.has(event.toolName) && SHELL_WRITE.test(command))) {
 			return { block: true, reason: `The Verifier directory ${pin.dir} is pinned for this Horizon Run and must not be modified. Change the system under test instead; only the user can re-pin (/horizon repin).` };
 		}
 	});
@@ -431,14 +432,16 @@ export default function omplongHorizon(pi: ExtensionAPI): void {
 	pi.on("tool_result", async event => {
 		if (!runActive() || typeof event.toolName !== "string" || !EXEC_TOOLS.has(event.toolName)) return;
 		const text = textOf(event.content);
-		const signature = failureSignature({ toolName: event.toolName, input: isRecord(event.input) ? event.input : {}, resultText: text, details: event.details });
+		const callInput = { toolName: event.toolName, input: isRecord(event.input) ? event.input : {}, resultText: text, details: event.details };
+		const signature = failureSignature(callInput);
+		const scriptSig = inlineScriptSignature(callInput);
 		const failed = event.isError === true;
 		if (failed) {
 			const list = recentErrors.get(signature) ?? [];
 			list.push(text.replace(/\s+/g, " ").trim().slice(-300));
 			recentErrors.set(signature, list.slice(-3));
 		}
-		const failures = window.breaker.record(signature, failed);
+		const failures = window.breaker.record(signature, failed, scriptSig);
 		if (failures !== undefined && !trip) await tripBreaker(signature, failures);
 	});
 

@@ -100,6 +100,8 @@ describe("stop gate", () => {
 		assert.match(JSON.stringify(await block("write", { path: ".omp/horizon/verify/run", content: "exit 0" })), /"block":true/);
 		assert.match(JSON.stringify(await block("bash", { command: "echo '{}' >> .omp/horizon/verify/run" })), /"block":true/);
 		assert.match(JSON.stringify(await block("edit", { input: `[${join(host.cwd, ".omp/horizon/verify/run")}#AB12]\nPUT 1:\n+x` })), /"block":true/);
+		assert.match(JSON.stringify(await block("bash", { command: "python3 -c \"open('.omp/horizon/verify/run','w').write('x')\"" })), /"block":true/);
+		assert.match(JSON.stringify(await block("eval", { code: "await write('.omp/horizon/verify/run', 'x')" })), /"block":true/);
 		assert.equal(await block("bash", { command: "cat .omp/horizon/verify/run" }), undefined);
 		assert.equal(await block("write", { path: "state.txt", content: "ok" }), undefined);
 	});

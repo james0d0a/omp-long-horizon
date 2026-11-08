@@ -193,3 +193,28 @@ export function failureSignature(call: SignatureInput): string {
 	const target = typeof call.input.host === "string" ? call.input.host : "";
 	return target ? `${call.toolName}:${target}` : call.toolName;
 }
+
+/**
+ * Content-hash signature of an inline script or eval call without traceback anchoring,
+ * so a later successful run of the same inline script can clear its earlier traceback-keyed failure.
+ */
+export function inlineScriptSignature(call: SignatureInput): string | undefined {
+	if (call.toolName === "bash") {
+		const command = typeof call.input.command === "string" ? call.input.command : "";
+		const argv = stripWrappers(failingArgvFromTrace(call.details) ?? mainArgvFromCommand(command));
+		if (argv.length === 0) return undefined;
+		const bin = baseName(argv[0]);
+		const rest = argv.slice(1);
+		const heredoc = /<<-?\s*['"]?\w+/.test(command);
+		const inline =
+			INLINE_INTERPRETERS.has(bin) && (rest.length === 0 || INLINE_FLAGS.has(rest[0]) || (heredoc && !rest.some(a => /\.\w+$/.test(a))));
+		if (!inline) return undefined;
+		const script = INLINE_FLAGS.has(rest[0]) && rest[1] ? rest[1] : command;
+		return `bash:${bin}:inline:${shortHash(script.replace(/\s+/g, " ").trim().slice(0, 400))}`;
+	}
+	if (call.toolName === "eval" || call.toolName === "python") {
+		const code = typeof call.input.code === "string" ? call.input.code : JSON.stringify(call.input);
+		return `${call.toolName}:${shortHash(code.replace(/\s+/g, " ").trim().slice(0, 400))}`;
+	}
+	return undefined;
+}

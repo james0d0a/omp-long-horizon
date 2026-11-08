@@ -3,7 +3,7 @@ import { describe, test } from "node:test";
 import { FailureWindow } from "../src/breaker.ts";
 import { applyProposedOps, current, emptyLedger, renderLedger } from "../src/ledger.ts";
 import { redact } from "../src/redact.ts";
-import { failureSignature } from "../src/signature.ts";
+import { failureSignature, inlineScriptSignature } from "../src/signature.ts";
 
 const bash = (command: string, resultText = "", details?: unknown) => failureSignature({ toolName: "bash", input: { command }, resultText, details });
 
@@ -62,6 +62,18 @@ describe("Circuit breaker window", () => {
 		v.record("a", true);
 		v.record("cat", false);
 		assert.equal(v.record("a", true), 3);
+	});
+
+	test("a retry of the same inline script that succeeds clears its traceback-anchored failure", () => {
+		const w = new FailureWindow({ threshold: 3, window: 8 });
+		const cmd = "python3 - <<'EOF'\nfrom lab import Host\nHost('a').ps('x')\nEOF";
+		const tb = 'Traceback (most recent call last):\n  File "<stdin>", line 3, in <module>\n  File "/lab/scenario/lab.py", line 79, in ps\nRuntimeError: boom';
+		const failCall = { toolName: "bash", input: { command: cmd }, resultText: tb };
+		const okCall = { toolName: "bash", input: { command: cmd }, resultText: "ok" };
+		w.record(failureSignature(failCall), true, inlineScriptSignature(failCall));
+		w.record(failureSignature(failCall), true, inlineScriptSignature(failCall));
+		w.record(failureSignature(okCall), false, inlineScriptSignature(okCall));
+		assert.equal(w.record(failureSignature(failCall), true, inlineScriptSignature(failCall)), undefined);
 	});
 
 	test("failures outside the window do not count", () => {
